@@ -10,13 +10,17 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      # No setup-android step: it fails trying to install Google's retired
-      # "tools" package. The ubuntu runner already ships the Android SDK,
-      # so use its sdkmanager directly.
-      - name: Install Android SDK packages
+      # The ubuntu runner does NOT ship the Android SDK, and setup-android@v3
+      # fails trying to install Google's retired "tools" package. Download
+      # cmdline-tools straight from Google and install the API 34 pieces.
+      - name: Install Android SDK
         run: |
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -name sdkmanager -type f | sort | head -1)
-          echo "Using sdkmanager: $SDKMANAGER"
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          cd /tmp
+          curl -sL -o cmdline-tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip"
+          unzip -q cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools"
+          mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-34" "build-tools;34.0.0"
       - uses: gradle/actions/setup-gradle@v3
