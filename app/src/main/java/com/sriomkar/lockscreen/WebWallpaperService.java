@@ -7,9 +7,6 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 public class WebWallpaperService extends WallpaperService {
-    private static final String TARGET_URL =
-        "https://jobs.sriomkar.com/lockscreen?job_id=li-4474501423&deadline=2026-11-30T23:59:00-05:00";
-
     @Override
     public Engine onCreateEngine() {
         return new WebEngine();
@@ -17,6 +14,7 @@ public class WebWallpaperService extends WallpaperService {
 
     private class WebEngine extends Engine {
         private WebView webView;
+        private String currentUrl;
 
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
@@ -28,7 +26,8 @@ public class WebWallpaperService extends WallpaperService {
             settings.setLoadWithOverviewMode(true);
             settings.setUseWideViewPort(true);
             webView.setWebViewClient(new WebViewClient());
-            webView.loadUrl(TARGET_URL);
+            currentUrl = SettingsActivity.loadUrl(WebWallpaperService.this);
+            webView.loadUrl(currentUrl);
         }
 
         @Override
@@ -49,6 +48,13 @@ public class WebWallpaperService extends WallpaperService {
             super.onVisibilityChanged(visible);
             if (webView == null) return;
             if (visible) {
+                // Pick up a link saved in settings — changing jobs needs
+                // no rebuild, just a new link in the app.
+                String url = SettingsActivity.loadUrl(WebWallpaperService.this);
+                if (!url.equals(currentUrl)) {
+                    currentUrl = url;
+                    webView.loadUrl(url);
+                }
                 webView.onResume();
                 webView.resumeTimers();
                 drawFrame(getSurfaceHolder());
