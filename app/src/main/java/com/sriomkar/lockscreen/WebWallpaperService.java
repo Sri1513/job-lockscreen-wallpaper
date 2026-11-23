@@ -15,6 +15,12 @@ public class WebWallpaperService extends WallpaperService {
     private class WebEngine extends Engine {
         private WebView webView;
         private String currentUrl;
+        // The saved-link value (with the stored background applied) that
+        // the engine last actually loaded. The saved link is only
+        // reloaded when this changes — otherwise every lock-screen show
+        // would yank the wallpaper back to the saved link after the
+        // auto-follow fetch switched it to the server's job.
+        private String lastSavedUrl;
 
         @Override
         public void onCreate(SurfaceHolder surfaceHolder) {
@@ -25,13 +31,25 @@ public class WebWallpaperService extends WallpaperService {
             settings.setDomStorageEnabled(true);
             settings.setLoadWithOverviewMode(true);
             settings.setUseWideViewPort(true);
-            webView.setWebViewClient(new WebViewClient());
+            // A page that finishes loading after the lock screen is
+            // already showing (the auto-follow fetch) is never painted
+            // unless we draw it: drawFrame only runs from visibility /
+            // surface events, which already happened before the async
+            // fetch completed. Repaint on every page finish so the
+            // server's job actually appears.
+            webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    drawFrame(WebEngine.this.getSurfaceHolder());
+                }
+            });
             // The stored background choice is applied to every URL the
             // wallpaper loads (saved link and server link alike), so it
             // survives the endpoint switching jobs.
             currentUrl = SettingsActivity.applyStoredBackground(
                     WebWallpaperService.this,
                     SettingsActivity.loadUrl(WebWallpaperService.this));
+            lastSavedUrl = currentUrl;
             webView.loadUrl(currentUrl);
         }
 
@@ -54,11 +72,16 @@ public class WebWallpaperService extends WallpaperService {
             if (webView == null) return;
             if (visible) {
                 // Pick up a link saved in settings — changing jobs needs
-                // no rebuild, just a new link in the app.
+                // no rebuild, just a new link in the app. Only reload
+                // when the saved value changed since it was last
+                // applied: after auto-follow switches to the server's
+                // job, the saved link is unchanged, so it must not
+                // override the server's job on every show.
                 String url = SettingsActivity.applyStoredBackground(
                         WebWallpaperService.this,
                         SettingsActivity.loadUrl(WebWallpaperService.this));
-                if (!url.equals(currentUrl)) {
+                if (!url.equals(lastSavedUrl)) {
+                    lastSavedUrl = url;
                     currentUrl = url;
                     webView.loadUrl(url);
                 }
