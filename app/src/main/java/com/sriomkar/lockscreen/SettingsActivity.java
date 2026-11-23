@@ -75,7 +75,7 @@ public class SettingsActivity extends Activity {
 
     private void saveUrl() {
         String url = urlField.getText().toString().trim();
-        if (!url.startsWith("https://") || !url.contains("lockscreen")) {
+        if (!CurrentJobUrl.isValidLockscreenUrl(url)) {
             Toast.makeText(this,
                     "That doesn't look like a lockscreen link — it must start "
                     + "with https:// and contain 'lockscreen'.",
