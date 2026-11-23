@@ -55,6 +55,11 @@ public class WebWallpaperService extends WallpaperService {
                     currentUrl = url;
                     webView.loadUrl(url);
                 }
+                // Auto-follow: ask the server which dream job is current.
+                // When it answers, its link wins; when it doesn't
+                // (offline, 404, bad body), the saved link above keeps
+                // showing — the screen never goes blank.
+                fetchCurrentJobUrl();
                 webView.onResume();
                 webView.resumeTimers();
                 drawFrame(getSurfaceHolder());
@@ -62,6 +67,28 @@ public class WebWallpaperService extends WallpaperService {
                 webView.onPause();
                 webView.pauseTimers();
             }
+        }
+
+        // Guards against a slow fetch applying after a newer one: only the
+        // latest request may change the URL.
+        private int fetchSeq;
+
+        private void fetchCurrentJobUrl() {
+            final int seq = ++fetchSeq;
+            new Thread(() -> {
+                String url = CurrentJobUrl.fetchCurrentUrl();
+                if (url == null) return; // endpoint silent — keep the saved link
+                WebView view = webView;
+                if (view == null) return; // engine destroyed meanwhile
+                view.post(() -> {
+                    if (seq != fetchSeq) return; // a newer fetch already answered
+                    if (webView == null) return;
+                    if (!url.equals(currentUrl)) {
+                        currentUrl = url;
+                        webView.loadUrl(url);
+                    }
+                });
+            }).start();
         }
 
         private void drawFrame(SurfaceHolder holder) {
