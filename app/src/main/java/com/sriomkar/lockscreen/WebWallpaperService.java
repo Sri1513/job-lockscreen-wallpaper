@@ -26,7 +26,12 @@ public class WebWallpaperService extends WallpaperService {
             settings.setLoadWithOverviewMode(true);
             settings.setUseWideViewPort(true);
             webView.setWebViewClient(new WebViewClient());
-            currentUrl = SettingsActivity.loadUrl(WebWallpaperService.this);
+            // The stored background choice is applied to every URL the
+            // wallpaper loads (saved link and server link alike), so it
+            // survives the endpoint switching jobs.
+            currentUrl = SettingsActivity.applyStoredBackground(
+                    WebWallpaperService.this,
+                    SettingsActivity.loadUrl(WebWallpaperService.this));
             webView.loadUrl(currentUrl);
         }
 
@@ -50,7 +55,9 @@ public class WebWallpaperService extends WallpaperService {
             if (visible) {
                 // Pick up a link saved in settings — changing jobs needs
                 // no rebuild, just a new link in the app.
-                String url = SettingsActivity.loadUrl(WebWallpaperService.this);
+                String url = SettingsActivity.applyStoredBackground(
+                        WebWallpaperService.this,
+                        SettingsActivity.loadUrl(WebWallpaperService.this));
                 if (!url.equals(currentUrl)) {
                     currentUrl = url;
                     webView.loadUrl(url);
@@ -83,9 +90,13 @@ public class WebWallpaperService extends WallpaperService {
                 view.post(() -> {
                     if (seq != fetchSeq) return; // a newer fetch already answered
                     if (webView == null) return;
-                    if (!url.equals(currentUrl)) {
-                        currentUrl = url;
-                        webView.loadUrl(url);
+                    // The stored background applies to the server link too
+                    // — the endpoint URL carries no bg param of its own.
+                    String effective = SettingsActivity.applyStoredBackground(
+                            WebWallpaperService.this, url);
+                    if (!effective.equals(currentUrl)) {
+                        currentUrl = effective;
+                        webView.loadUrl(effective);
                     }
                 });
             }).start();
