@@ -108,11 +108,18 @@ public class WebWallpaperService extends WallpaperService {
             new Thread(() -> {
                 String url = CurrentJobUrl.fetchCurrentUrl();
                 if (url == null) return; // endpoint silent — keep the saved link
-                WebView view = webView;
-                if (view == null) return; // engine destroyed meanwhile
-                view.post(() -> {
+                // Deliver on the main looper, NOT view.post(): this
+                // WebView is created with the Service context and is
+                // never attached to a window (the engine draws it
+                // manually with webView.draw(canvas)), so View.post()
+                // queues the Runnable in the view's RunQueue, which
+                // only flushes on attach — the callback would never
+                // run and the switch would never happen. The main
+                // looper always delivers, and WebView calls need the
+                // UI thread anyway.
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
                     if (seq != fetchSeq) return; // a newer fetch already answered
-                    if (webView == null) return;
+                    if (webView == null) return; // engine destroyed meanwhile
                     // The stored background applies to the server link too
                     // — the endpoint URL carries no bg param of its own.
                     String effective = SettingsActivity.applyStoredBackground(
